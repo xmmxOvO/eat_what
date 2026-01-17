@@ -123,7 +123,7 @@ function App() {
 
           allResults = [...allResults, ...pois];
 
-          if (result.poiList.pois.length === 50 && allResults.length < 200) {
+          if (result.poiList.pois.length === 50 && allResults.length < 300) {
             searchPage(pageIndex + 1);
           } else {
             setRestaurants(allResults);
@@ -249,14 +249,14 @@ function App() {
       <div className="px-6">
         <div 
           ref={scrollContainerRef}
-          className="grid grid-cols-2 gap-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar"
+          className="grid grid-cols-3 gap-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar"
         >
           {isSearching ? (
             // Skeleton Screen
-            [...Array(6)].map((_, i) => (
-              <div key={i} className="border-4 border-gray-200 rounded-xl p-3 flex flex-col gap-2 bg-gray-50 animate-pulse">
-                <div className="h-6 bg-gray-200 rounded w-3/4"></div>
-                <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+            [...Array(9)].map((_, i) => (
+              <div key={i} className="border-4 border-gray-200 rounded-xl p-2 flex flex-col gap-2 bg-gray-50 animate-pulse">
+                <div className="h-4 bg-gray-200 rounded w-full"></div>
+                <div className="h-3 bg-gray-200 rounded w-2/3"></div>
               </div>
             ))
           ) : restaurants.length > 0 ? (
@@ -272,24 +272,24 @@ function App() {
                   borderColor: highlightedIndex === index ? '#FF3D00' : '#000000',
                 }}
                 className={cn(
-                  "border-4 rounded-xl p-3 flex flex-col gap-2 transition-colors",
-                  highlightedIndex === index ? "z-10 shadow-[4px_4px_0px_0px_#FF3D00]" : "shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
+                  "border-2 rounded-xl p-2 flex flex-col gap-1 transition-colors",
+                  highlightedIndex === index ? "z-10 shadow-[3px_3px_0px_0px_#FF3D00]" : "shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]"
                 )}
               >
-                <div className="font-black text-lg truncate">{res.name}</div>
+                <div className="font-black text-[10px] leading-tight truncate">{res.name}</div>
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1 text-xs font-bold text-gray-500">
-                    <Star size={12} className="fill-yellow-400 text-yellow-400" />
+                  <div className="flex items-center gap-0.5 text-[8px] font-bold text-gray-500">
+                    <Star size={8} className="fill-yellow-400 text-yellow-400" />
                     {res.rating}
                   </div>
-                  <div className="text-[10px] font-black bg-gray-100 px-1 rounded border border-black">
+                  <div className="text-[8px] font-black bg-gray-100 px-0.5 rounded border border-black">
                     {res.distance}m
                   </div>
                 </div>
               </motion.div>
             ))
           ) : (
-            <div className="col-span-2 py-12 text-center border-4 border-dashed border-gray-300 rounded-2xl text-gray-400 font-bold flex flex-col items-center gap-2">
+            <div className="col-span-3 py-12 text-center border-4 border-dashed border-gray-300 rounded-2xl text-gray-400 font-bold flex flex-col items-center gap-2">
               <Utensils size={48} className="opacity-20" />
               <span>输入地址，看看周围有啥好吃的</span>
             </div>
