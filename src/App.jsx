@@ -220,7 +220,7 @@ function App() {
 
       {/* Search Section */}
       <div className="px-6 mb-6">
-        <div className="flex flex-row gap-2 mb-3">
+        <div className="flex flex-row gap-2 mb-5">
           <div className="relative group flex-1">
             <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-[#FF3D00] group-focus-within:scale-110 transition-transform" size={16} />
             <input
@@ -241,14 +241,14 @@ function App() {
           </button>
         </div>
 
-        {/* Distance Filter - Moved below search bar */}
-        <div className="flex flex-row gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+        {/* Distance Filter - Added pt-2 and improved spacing */}
+        <div className="flex flex-row gap-1.5 overflow-x-auto pt-2 pb-2 no-scrollbar">
           {DISTANCE_OPTIONS.map((opt) => (
             <button
               key={opt.value}
               onClick={() => setDistance(opt.value)}
               className={cn(
-                "px-3 py-1 rounded-full text-[10px] font-black border-2 transition-all whitespace-nowrap",
+                "px-3 py-1.5 rounded-full text-[10px] font-black border-2 transition-all whitespace-nowrap",
                 distance === opt.value 
                   ? "bg-[#FFD600] border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] translate-x-[-1px] translate-y-[-1px]" 
                   : "bg-white border-gray-200 text-gray-400"
@@ -440,6 +440,13 @@ function App() {
       </AnimatePresence>
 
       <style>{`
+        .no-scrollbar::-webkit-scrollbar {
+          display: none;
+        }
+        .no-scrollbar {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
         .custom-scrollbar::-webkit-scrollbar {
           width: 8px;
         }
