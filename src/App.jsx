@@ -119,7 +119,6 @@ function App() {
 
     const searchPage = (pageIndex) => {
       placeSearch.setPageIndex(pageIndex);
-      // 使用明确传递进来的 searchRadius
       placeSearch.searchNearBy('', location, searchRadius, (status, result) => {
         if (status === 'complete' && result.poiList) {
           const pois = result.poiList.pois.map(poi => ({
@@ -128,19 +127,20 @@ function App() {
             address: poi.address || '暂无详细地址',
             rating: poi.biz_ext?.rating || (Math.random() * 1.5 + 3.5).toFixed(1),
             image: poi.photos?.[0]?.url || `https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=500&q=80`,
-            distance: parseInt(poi.distance), // 确保是数字
+            distance: parseInt(poi.distance),
             location: poi.location
           }));
 
           allResults = [...allResults, ...pois];
 
-          // 动态调整上限：2km 模式下允许获取更多
-          const maxCount = searchRadius >= 2000 ? 2000 : (searchRadius >= 1000 ? 1000 : 300);
+          // 这里的 searchRadius 是数字
+          const totalFound = result.poiList.count;
+          const maxAllowed = searchRadius >= 2000 ? 5000 : (searchRadius >= 1000 ? 1000 : 300);
 
-          if (result.poiList.pois.length === 50 && allResults.length < maxCount) {
+          // 只要还没搜完，且没达到我们的上限，就继续下一页
+          if (allResults.length < totalFound && allResults.length < maxAllowed) {
             searchPage(pageIndex + 1);
           } else {
-            // 最终结果按距离排序
             const sortedResults = allResults.sort((a, b) => a.distance - b.distance);
             setRestaurants(sortedResults);
             setIsSearching(false);
@@ -266,6 +266,15 @@ function App() {
             </button>
           ))}
         </div>
+
+        {/* 诊断信息面板 */}
+        {restaurants.length > 0 && !isSearching && (
+          <div className="mt-2 text-[9px] text-gray-400 font-bold flex justify-between px-1">
+            <span>找到 {restaurants.length} 家餐厅</span>
+            <span>覆盖范围: {restaurants[restaurants.length - 1].distance}m</span>
+          </div>
+        )}
+
         <AnimatePresence>
           {errorMsg && (
             <motion.p 
