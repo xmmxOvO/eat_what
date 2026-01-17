@@ -4,50 +4,152 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
+// --- 高德地图配置说明 ---
+// 1. 访问高德开放平台 (https://lbs.amap.com/) 注册账号。
+// 2. 在控制台创建应用，添加 Key，选择 "Web 端 (JS API)"。
+// 3. 获取 Key 和 安全密钥 (jscode)。
+const AMAP_CONFIG = {
+  key: '9b88afd029eeb91495ebb1a0f7b810f2', // 在此输入你的 Key
+  securityJsCode: '423f2aaeba47e4eb81b01a0bab034346', // 在此输入你的安全密钥 (jscode)
+};
+
 function cn(...inputs) {
   return twMerge(clsx(inputs));
 }
 
-const MOCK_RESTAURANTS = [
-  { id: 1, name: "老王拉面", address: "幸福路 123 号", image: "https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=500&q=80", rating: 4.5 },
-  { id: 2, name: "张姐麻辣烫", address: "平安大道 456 号", image: "https://images.unsplash.com/photo-1585032226651-759b368d7246?w=500&q=80", rating: 4.2 },
-  { id: 3, name: "快乐汉堡", address: "阳光里 789 号", image: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500&q=80", rating: 4.8 },
-  { id: 4, name: "四川小吃", address: "美食街 10 号", image: "https://images.unsplash.com/photo-1512058560366-cd242d45547e?w=500&q=80", rating: 4.6 },
-  { id: 5, name: "东北大水饺", address: "团结巷 88 号", image: "https://images.unsplash.com/photo-1534422298391-e4f8c170db0a?w=500&q=80", rating: 4.4 },
-  { id: 6, name: "精致粤菜", address: "滨江路 1 号", image: "https://images.unsplash.com/photo-1563245332-692543972183?w=500&q=80", rating: 4.7 },
-  { id: 7, name: "韩式烤肉", address: "流行中心 B1", image: "https://images.unsplash.com/photo-1498654896293-37aacf113fd9?w=500&q=80", rating: 4.5 },
-  { id: 8, name: "意式披萨", address: "西餐区 22 号", image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=500&q=80", rating: 4.3 },
-  { id: 9, name: "日式居酒屋", address: "和风街 5 号", image: "https://images.unsplash.com/photo-1580822184713-fc5400e7fe10?w=500&q=80", rating: 4.9 },
-  { id: 10, name: "泰式火锅", address: "香料园 303", image: "https://images.unsplash.com/photo-1559339352-11d035aa65de?w=500&q=80", rating: 4.4 },
-];
-
 function App() {
-  const [address, setAddress] = useState('');
+  const [address, setAddress] = useState(() => localStorage.getItem('last_address') || '');
   const [restaurants, setRestaurants] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isSpinning, setIsSpinning] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(null);
   const [selectedRestaurant, setSelectedRestaurant] = useState(null);
   const [showResult, setShowResult] = useState(false);
+  const [mapReady, setMapReady] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
 
   const scrollContainerRef = useRef(null);
 
-  const handleSearch = () => {
-    if (!address) {
-      alert('请输入地址先！');
+  // 持久化地址
+  useEffect(() => {
+    localStorage.setItem('last_address', address);
+  }, [address]);
+
+  // 初始化高德地图脚本
+  useEffect(() => {
+    if (window.AMap) {
+      setMapReady(true);
       return;
     }
+
+    // 设置安全密钥 (必须在加载脚本前)
+    window._AMapSecurityConfig = {
+      securityJsCode: AMAP_CONFIG.securityJsCode,
+    };
+
+    const script = document.createElement('script');
+    script.src = `https://webapi.amap.com/maps?v=2.0&key=${AMAP_CONFIG.key}&plugin=AMap.Geocoder,AMap.PlaceSearch`;
+    script.async = true;
+    script.onload = () => setMapReady(true);
+    document.head.appendChild(script);
+
+    return () => {
+      document.head.removeChild(script);
+    };
+  }, []);
+
+  const handleSearch = async () => {
+    if (!address) {
+      setErrorMsg('你在哪儿呢？先输入地址吧！');
+      setTimeout(() => setErrorMsg(''), 3000);
+      return;
+    }
+    if (!AMAP_CONFIG.key) {
+      setErrorMsg('请配置高德地图 API Key！');
+      return;
+    }
+    if (!mapReady) {
+      setErrorMsg('地图库还在加载，请稍等一秒...');
+      return;
+    }
+
     setIsSearching(true);
-    // Simulate API call
-    setTimeout(() => {
-      setRestaurants(MOCK_RESTAURANTS.sort(() => Math.random() - 0.5));
+    setRestaurants([]);
+    setErrorMsg('');
+
+    try {
+      const geocoder = new window.AMap.Geocoder();
+      
+      // 1. 地理编码：地址 -> 经纬度
+      geocoder.getLocation(address, (status, result) => {
+        if (status === 'complete' && result.geocodes.length > 0) {
+          const location = result.geocodes[0].location;
+          fetchNearbyRestaurants(location);
+        } else {
+          setErrorMsg('高德没找到这个地址... 试着写详细点？');
+          setIsSearching(false);
+        }
+      });
+    } catch (error) {
+      console.error('搜索出错:', error);
+      setErrorMsg('发生了一些错误，请检查网络或刷新重试。');
       setIsSearching(false);
-    }, 800);
+    }
+  };
+
+  const fetchNearbyRestaurants = (location) => {
+    const placeSearch = new window.AMap.PlaceSearch({
+      type: '餐饮服务',
+      pageSize: 50,
+      pageIndex: 1,
+      extensions: 'all',
+    });
+
+    let allResults = [];
+
+    const searchPage = (pageIndex) => {
+      placeSearch.setPageIndex(pageIndex);
+      placeSearch.searchNearBy('', location, 500, (status, result) => {
+        if (status === 'complete' && result.poiList) {
+          const pois = result.poiList.pois.map(poi => ({
+            id: poi.id,
+            name: poi.name,
+            address: poi.address || '暂无详细地址',
+            rating: poi.biz_ext?.rating || (Math.random() * 1.5 + 3.5).toFixed(1),
+            image: poi.photos?.[0]?.url || `https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=500&q=80`,
+            distance: poi.distance,
+            location: poi.location
+          }));
+
+          allResults = [...allResults, ...pois];
+
+          if (result.poiList.pois.length === 50 && allResults.length < 200) {
+            searchPage(pageIndex + 1);
+          } else {
+            setRestaurants(allResults);
+            setIsSearching(false);
+          }
+        } else if (status === 'no_data') {
+          if (allResults.length > 0) {
+            setRestaurants(allResults);
+          } else {
+            setErrorMsg('方圆 500 米内好像真没吃的... 你在沙漠吗？');
+          }
+          setIsSearching(false);
+        } else {
+          setErrorMsg('获取周边餐厅失败，请重试。');
+          setIsSearching(false);
+        }
+      });
+    };
+
+    searchPage(1);
   };
 
   const handleRandomize = () => {
     if (restaurants.length === 0) {
-      alert('先搜索周边的美食吧！');
+      setErrorMsg('先搜索周边的美食，才能开始随机挑选哦！');
+      setTimeout(() => setErrorMsg(''), 3000);
       return;
     }
     if (isSpinning) return;
@@ -55,6 +157,7 @@ function App() {
     setIsSpinning(true);
     setSelectedRestaurant(null);
     setShowResult(false);
+    setErrorMsg('');
 
     let duration = 3000;
     let startTime = Date.now();
@@ -66,16 +169,13 @@ function App() {
 
       if (elapsed < duration) {
         setHighlightedIndex(Math.floor(Math.random() * restaurants.length));
-        // Gradually slow down
         const progress = elapsed / duration;
         const currentSpeed = speed + (progress * 200);
         setTimeout(spin, currentSpeed);
       } else {
-        // Final selection
         const finalIndex = Math.floor(Math.random() * restaurants.length);
         setHighlightedIndex(finalIndex);
         
-        // Flash 3 times (on/off cycles)
         let flashCount = 0;
         const flashInterval = setInterval(() => {
           setHighlightedIndex(prev => prev === null ? finalIndex : null);
@@ -118,6 +218,7 @@ function App() {
               type="text"
               value={address}
               onChange={(e) => setAddress(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
               placeholder="你在哪儿呢？"
               className="w-full bg-white border-4 border-black rounded-2xl py-4 pl-12 pr-4 text-lg font-bold shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] focus:outline-none focus:translate-x-1 focus:translate-y-1 focus:shadow-none transition-all"
             />
@@ -127,9 +228,21 @@ function App() {
             disabled={isSearching}
             className="bg-[#00E676] text-black border-4 border-black rounded-2xl px-6 py-4 text-xl font-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 transition-all flex items-center justify-center gap-2 hover:bg-[#00c853] whitespace-nowrap"
           >
-            {isSearching ? '探测中...' : <Search size={24} />}
+            {isSearching ? <div className="animate-spin rounded-full h-6 w-6 border-4 border-black border-t-transparent" /> : <Search size={24} />}
           </button>
         </div>
+        <AnimatePresence>
+          {errorMsg && (
+            <motion.p 
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="mt-4 text-xs text-red-500 font-bold bg-red-50 p-3 rounded-xl border-4 border-red-200 shadow-[4px_4px_0px_0px_#fee2e2]"
+            >
+              ⚠️ {errorMsg}
+            </motion.p>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Cards Area */}
@@ -138,7 +251,15 @@ function App() {
           ref={scrollContainerRef}
           className="grid grid-cols-2 gap-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar"
         >
-          {restaurants.length > 0 ? (
+          {isSearching ? (
+            // Skeleton Screen
+            [...Array(6)].map((_, i) => (
+              <div key={i} className="border-4 border-gray-200 rounded-xl p-3 flex flex-col gap-2 bg-gray-50 animate-pulse">
+                <div className="h-6 bg-gray-200 rounded w-3/4"></div>
+                <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+              </div>
+            ))
+          ) : restaurants.length > 0 ? (
             restaurants.map((res, index) => (
               <motion.div
                 key={res.id}
@@ -156,15 +277,21 @@ function App() {
                 )}
               >
                 <div className="font-black text-lg truncate">{res.name}</div>
-                <div className="flex items-center gap-1 text-xs font-bold text-gray-500">
-                  <Star size={12} className="fill-yellow-400 text-yellow-400" />
-                  {res.rating}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1 text-xs font-bold text-gray-500">
+                    <Star size={12} className="fill-yellow-400 text-yellow-400" />
+                    {res.rating}
+                  </div>
+                  <div className="text-[10px] font-black bg-gray-100 px-1 rounded border border-black">
+                    {res.distance}m
+                  </div>
                 </div>
               </motion.div>
             ))
           ) : (
-            <div className="col-span-2 py-12 text-center border-4 border-dashed border-gray-300 rounded-2xl text-gray-400 font-bold">
-              输入地址，看看周围有啥好吃的
+            <div className="col-span-2 py-12 text-center border-4 border-dashed border-gray-300 rounded-2xl text-gray-400 font-bold flex flex-col items-center gap-2">
+              <Utensils size={48} className="opacity-20" />
+              <span>输入地址，看看周围有啥好吃的</span>
             </div>
           )}
         </div>
@@ -217,7 +344,7 @@ function App() {
                     transition={{ delay: 0.2 }}
                     className="bg-[#FFD600] inline-block px-4 py-1 rounded-full text-black font-black text-sm mb-2"
                   >
-                    命中注定
+                    命中注定 ({selectedRestaurant.distance}m)
                   </motion.div>
                   <h2 className="text-4xl font-black text-white">{selectedRestaurant.name}</h2>
                 </div>
@@ -230,12 +357,18 @@ function App() {
                   </div>
                   <div>
                     <div className="text-gray-500 font-bold text-sm">餐厅地址</div>
-                    <div className="text-xl font-black">{selectedRestaurant.address}</div>
+                    <div className="text-xl font-black leading-tight">{selectedRestaurant.address}</div>
                   </div>
                 </div>
 
                 <div className="flex gap-4">
-                  <button className="flex-1 bg-black text-white py-4 rounded-2xl font-black text-lg flex items-center justify-center gap-2 active:scale-95 transition-transform">
+                  <button 
+                    onClick={() => {
+                      const url = `https://uri.amap.com/marker?position=${selectedRestaurant.location.lng},${selectedRestaurant.location.lat}&name=${selectedRestaurant.name}`;
+                      window.open(url, '_blank');
+                    }}
+                    className="flex-1 bg-black text-white py-4 rounded-2xl font-black text-lg flex items-center justify-center gap-2 active:scale-95 transition-transform"
+                  >
                     <Navigation size={20} /> 导航去吃
                   </button>
                   <button 
@@ -250,7 +383,6 @@ function App() {
                 </div>
               </div>
 
-              {/* Confetti effect placeholder or just some stars */}
               <div className="absolute top-0 left-0 w-full h-full pointer-events-none overflow-hidden">
                 {[...Array(6)].map((_, i) => (
                   <motion.div
