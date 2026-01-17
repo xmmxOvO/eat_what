@@ -20,6 +20,7 @@ function cn(...inputs) {
 function App() {
   const [address, setAddress] = useState(() => localStorage.getItem('last_address') || '');
   const [distance, setDistance] = useState(500);
+  const [category, setCategory] = useState('餐饮服务');
   const [restaurants, setRestaurants] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isSpinning, setIsSpinning] = useState(false);
@@ -37,6 +38,13 @@ function App() {
     { label: '500m', value: 500 },
     { label: '1km', value: 1000 },
     { label: '2km', value: 2000 },
+  ];
+
+  const CATEGORY_OPTIONS = [
+    { label: '全部', value: '餐饮服务' },
+    { label: '三餐', value: '中餐厅|外国餐厅|快餐厅' },
+    { label: '甜点', value: '甜品店|糕点店' },
+    { label: '饮品', value: '咖啡厅|奶茶店|饮品店|茶艺馆' },
   ];
 
   // 持久化地址
@@ -90,11 +98,11 @@ function App() {
       const geocoder = new window.AMap.Geocoder();
       
       // 1. 地理编码：地址 -> 经纬度
-    geocoder.getLocation(address, (status, result) => {
+      geocoder.getLocation(address, (status, result) => {
         if (status === 'complete' && result.geocodes.length > 0) {
           const location = result.geocodes[0].location;
-          // 明确传递当前的 distance 值，避免闭包问题
-          fetchNearbyRestaurants(location, distance);
+          // 明确传递当前的 distance 和 category 值
+          fetchNearbyRestaurants(location, distance, category);
         } else {
           setErrorMsg('高德没找到这个地址... 试着写详细点？');
           setIsSearching(false);
@@ -107,9 +115,9 @@ function App() {
     }
   };
 
-  const fetchNearbyRestaurants = (location, searchRadius) => {
+  const fetchNearbyRestaurants = (location, searchRadius, searchType) => {
     const placeSearch = new window.AMap.PlaceSearch({
-      type: '餐饮服务',
+      type: searchType, // 使用选中的分类
       pageSize: 50,
       pageIndex: 1,
       extensions: 'all',
@@ -133,11 +141,10 @@ function App() {
 
           allResults = [...allResults, ...pois];
 
-          // 这里的 searchRadius 是数字
           const totalFound = result.poiList.count;
-          const maxAllowed = searchRadius >= 2000 ? 5000 : (searchRadius >= 1000 ? 1000 : 300);
+          // 2km 模式下，为了突破高德 200 条限制，我们设置更高的获取上限
+          const maxAllowed = searchRadius >= 2000 ? 2000 : (searchRadius >= 1000 ? 1000 : 300);
 
-          // 只要还没搜完，且没达到我们的上限，就继续下一页
           if (allResults.length < totalFound && allResults.length < maxAllowed) {
             searchPage(pageIndex + 1);
           } else {
@@ -150,7 +157,7 @@ function App() {
             const sortedResults = allResults.sort((a, b) => a.distance - b.distance);
             setRestaurants(sortedResults);
           } else {
-            setErrorMsg(`方圆 ${searchRadius >= 1000 ? (searchRadius/1000)+'km' : searchRadius+'米'} 内好像真没吃的...`);
+            setErrorMsg(`方圆 ${searchRadius >= 1000 ? (searchRadius/1000)+'km' : searchRadius+'米'} 内好像真没发现这类吃的...`);
           }
           setIsSearching(false);
         } else {
@@ -250,7 +257,7 @@ function App() {
         </div>
 
         {/* Distance Filter - Added pt-2 and improved spacing */}
-        <div className="flex flex-row gap-1.5 overflow-x-auto pt-2 pb-2 no-scrollbar">
+        <div className="flex flex-row gap-1.5 overflow-x-auto pt-2 pb-1 no-scrollbar">
           {DISTANCE_OPTIONS.map((opt) => (
             <button
               key={opt.value}
@@ -259,6 +266,24 @@ function App() {
                 "px-3 py-1.5 rounded-full text-[10px] font-black border-2 transition-all whitespace-nowrap",
                 distance === opt.value 
                   ? "bg-[#FFD600] border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] translate-x-[-1px] translate-y-[-1px]" 
+                  : "bg-white border-gray-200 text-gray-400"
+              )}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Category Filter */}
+        <div className="flex flex-row gap-1.5 overflow-x-auto pt-2 pb-2 no-scrollbar">
+          {CATEGORY_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => setCategory(opt.value)}
+              className={cn(
+                "px-3 py-1.5 rounded-full text-[10px] font-black border-2 transition-all whitespace-nowrap",
+                category === opt.value 
+                  ? "bg-[#00E676] border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] translate-x-[-1px] translate-y-[-1px]" 
                   : "bg-white border-gray-200 text-gray-400"
               )}
             >
