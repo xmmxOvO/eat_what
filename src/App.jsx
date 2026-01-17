@@ -278,7 +278,7 @@ function App() {
         </div>
 
         {/* Category Filter */}
-        <div className="flex flex-row gap-1.5 overflow-x-auto pt-4 pb-2 no-scrollbar">
+        <div className="flex flex-row gap-1.5 overflow-x-auto pt-4 pb-2 px-1 -mx-1 no-scrollbar">
           {CATEGORY_OPTIONS.map((opt) => (
             <button
               key={opt.value}
