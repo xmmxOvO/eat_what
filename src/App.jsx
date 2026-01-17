@@ -19,6 +19,8 @@ function cn(...inputs) {
 
 function App() {
   const [address, setAddress] = useState(() => localStorage.getItem('last_address') || '');
+  const [addressInput, setAddressInput] = useState(() => localStorage.getItem('last_address') || '');
+  const [lockedLocation, setLockedLocation] = useState(null);
   const [distance, setDistance] = useState(500);
   const [category, setCategory] = useState('050100|050200|050300|050400');
   const [restaurants, setRestaurants] = useState([]);
@@ -29,8 +31,16 @@ function App() {
   const [showResult, setShowResult] = useState(false);
   const [mapReady, setMapReady] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
-
+  
+  // 地址自动完成相关状态
+  const [autocompleteSuggestions, setAutocompleteSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+  
   const scrollContainerRef = useRef(null);
+  const inputRef = useRef(null);
+  const autocompleteRef = useRef(null);
+  const debounceTimerRef = useRef(null);
 
   const DISTANCE_OPTIONS = [
     { label: '100m', value: 100 },
@@ -48,14 +58,27 @@ function App() {
 
   // 当分类改变时自动触发搜索
   useEffect(() => {
-    if (address && mapReady) {
-      handleSearch();
+    if (lockedLocation && mapReady) {
+      fetchNearbyRestaurants(lockedLocation, distance, category);
     }
   }, [category]);
 
+  // 点击外部关闭下拉列表
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (inputRef.current && !inputRef.current.contains(event.target)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   // 持久化地址
   useEffect(() => {
-    localStorage.setItem('last_address', address);
+    if (address) {
+      localStorage.setItem('last_address', address);
+    }
   }, [address]);
 
   // 初始化高德地图脚本
@@ -71,7 +94,7 @@ function App() {
     };
 
     const script = document.createElement('script');
-    script.src = `https://webapi.amap.com/maps?v=2.0&key=${AMAP_CONFIG.key}&plugin=AMap.Geocoder,AMap.PlaceSearch`;
+    script.src = `https://webapi.amap.com/maps?v=2.0&key=${AMAP_CONFIG.key}&plugin=AMap.Geocoder,AMap.PlaceSearch,AMap.AutoComplete`;
     script.async = true;
     script.onload = () => setMapReady(true);
     document.head.appendChild(script);
@@ -81,47 +104,111 @@ function App() {
     };
   }, []);
 
+  // 初始化 AutoComplete
+  useEffect(() => {
+    if (!mapReady || !window.AMap || autocompleteRef.current) return;
+
+    autocompleteRef.current = new window.AMap.AutoComplete({
+      city: '全国',
+      citylimit: false,
+    });
+  }, [mapReady]);
+
+  // 防抖函数
+  const debounce = (func, delay) => {
+    return (...args) => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+      debounceTimerRef.current = setTimeout(() => func(...args), delay);
+    };
+  };
+
+  // 处理地址输入变化
+  const handleAddressInputChange = (value) => {
+    setAddressInput(value);
+    setShowSuggestions(true);
+    setLockedLocation(null);
+    
+    if (!value.trim()) {
+      setAutocompleteSuggestions([]);
+      return;
+    }
+
+    if (!autocompleteRef.current) return;
+
+    setIsLoadingSuggestions(true);
+    
+    // 防抖搜索
+    const debouncedSearch = debounce((keyword) => {
+      autocompleteRef.current.search(keyword, (status, result) => {
+        setIsLoadingSuggestions(false);
+        if (status === 'complete' && result.tips) {
+          const suggestions = result.tips
+            .filter(tip => tip.location && tip.name)
+            .map(tip => ({
+              name: tip.name,
+              district: tip.district || '',
+              adcode: tip.adcode,
+              location: tip.location,
+            }));
+          setAutocompleteSuggestions(suggestions);
+        } else {
+          setAutocompleteSuggestions([]);
+        }
+      });
+    }, 300);
+
+    debouncedSearch(value);
+  };
+
+  // 选择地址
+  const handleSelectAddress = (suggestion) => {
+    setAddressInput(suggestion.name);
+    setAddress(suggestion.name);
+    setLockedLocation(suggestion.location);
+    setShowSuggestions(false);
+    setAutocompleteSuggestions([]);
+    
+    // 自动触发搜索
+    if (suggestion.location) {
+      fetchNearbyRestaurants(suggestion.location, distance, category);
+    }
+  };
+
   const handleSearch = async () => {
-    if (!address) {
+    if (!addressInput.trim()) {
       setErrorMsg('你在哪儿呢？先输入地址吧！');
       setTimeout(() => setErrorMsg(''), 3000);
       return;
     }
-    if (!AMAP_CONFIG.key) {
-      setErrorMsg('请配置高德地图 API Key！');
-      return;
-    }
-    if (!mapReady) {
-      setErrorMsg('地图库还在加载，请稍等一秒...');
+
+    // 如果已有锁定位置，直接使用
+    if (lockedLocation) {
+      setIsSearching(true);
+      setRestaurants([]);
+      setErrorMsg('');
+      fetchNearbyRestaurants(lockedLocation, distance, category);
       return;
     }
 
+    // 否则尝试从下拉列表中选择
+    if (autocompleteSuggestions.length === 0) {
+      setErrorMsg('未找到准确位置，请从下拉列表中选择');
+      setTimeout(() => setErrorMsg(''), 3000);
+      return;
+    }
+
+    // 如果用户没有选择，提示从列表中选择
+    setErrorMsg('请从下拉列表中选择一个准确的地址');
+    setTimeout(() => setErrorMsg(''), 3000);
+  };
+
+  const fetchNearbyRestaurants = (location, searchRadius, searchType) => {
     setIsSearching(true);
     setRestaurants([]);
     setErrorMsg('');
 
-    try {
-      const geocoder = new window.AMap.Geocoder();
-      
-      // 1. 地理编码：地址 -> 经纬度
-      geocoder.getLocation(address, (status, result) => {
-        if (status === 'complete' && result.geocodes.length > 0) {
-          const location = result.geocodes[0].location;
-          // 明确传递当前的 distance 和 category 值
-          fetchNearbyRestaurants(location, distance, category);
-        } else {
-          setErrorMsg('高德没找到这个地址... 试着写详细点？');
-          setIsSearching(false);
-        }
-      });
-    } catch (error) {
-      console.error('搜索出错:', error);
-      setErrorMsg('发生了一些错误，请检查网络或刷新重试。');
-      setIsSearching(false);
-    }
-  };
-
-  const fetchNearbyRestaurants = (location, searchRadius, searchType) => {
     const placeSearch = new window.AMap.PlaceSearch({
       type: searchType, // 使用选中的分类
       pageSize: 50,
@@ -242,16 +329,56 @@ function App() {
       {/* Search Section */}
       <div className="px-6 mb-6">
         <div className="flex flex-row gap-2 mb-4">
-          <div className="relative group flex-1">
-            <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-[#FF3D00] group-focus-within:scale-110 transition-transform" size={16} />
+          <div className="relative group flex-1" ref={inputRef}>
+            <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-[#FF3D00] group-focus-within:scale-110 transition-transform z-10" size={16} />
             <input
               type="text"
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+              value={addressInput}
+              onChange={(e) => handleAddressInputChange(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleSearch();
+                } else if (e.key === 'Escape') {
+                  setShowSuggestions(false);
+                }
+              }}
+              onFocus={() => {
+                if (autocompleteSuggestions.length > 0) {
+                  setShowSuggestions(true);
+                }
+              }}
               placeholder="你在哪儿呢？"
               className="w-full bg-white border-2 border-black rounded-xl py-2.5 pl-10 pr-4 text-sm font-bold shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] focus:outline-none focus:translate-x-0.5 focus:translate-y-0.5 focus:shadow-none transition-all"
             />
+            
+            {/* 地址下拉提示列表 */}
+            <AnimatePresence>
+              {showSuggestions && (autocompleteSuggestions.length > 0 || isLoadingSuggestions) && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="absolute top-full left-0 right-0 mt-1 bg-white border-2 border-black rounded-xl shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] max-h-60 overflow-y-auto z-50 custom-scrollbar"
+                >
+                  {isLoadingSuggestions ? (
+                    <div className="p-3 text-center text-xs font-bold text-gray-400">正在搜索...</div>
+                  ) : autocompleteSuggestions.length > 0 ? (
+                    autocompleteSuggestions.map((suggestion, index) => (
+                      <button
+                        key={index}
+                        onClick={() => handleSelectAddress(suggestion)}
+                        className="w-full text-left px-4 py-3 hover:bg-[#FFFBEB] border-b-2 border-gray-100 last:border-b-0 transition-colors"
+                      >
+                        <div className="font-black text-sm text-black">{suggestion.name}</div>
+                        <div className="text-[10px] text-gray-500 mt-0.5">{suggestion.district}</div>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="p-3 text-center text-xs font-bold text-gray-400">未找到相关地址</div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
           {/* Distance Select - Integrated into search row */}
