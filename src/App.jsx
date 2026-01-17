@@ -132,11 +132,17 @@ function App() {
 
           allResults = [...allResults, ...pois];
 
-          if (result.poiList.pois.length === 50 && allResults.length < 300) {
+          // 动态调整上限：距离越远，允许获取的数量越多
+          const maxCount = distance >= 1000 ? 1000 : 300;
+
+          if (result.poiList.pois.length === 50 && allResults.length < maxCount) {
             searchPage(pageIndex + 1);
           } else {
             setRestaurants(allResults);
             setIsSearching(false);
+            if (allResults.length >= maxCount) {
+              console.log(`已达到搜寻上限 ${maxCount} 条`);
+            }
           }
         } else if (status === 'no_data') {
           if (allResults.length > 0) {
