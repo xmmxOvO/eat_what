@@ -272,7 +272,7 @@ function App() {
         </div>
 
         {/* Category Filter */}
-        <div className="flex flex-row gap-1.5 overflow-x-auto pb-2 no-scrollbar">
+        <div className="flex flex-row gap-1.5 overflow-x-auto pt-4 pb-2 no-scrollbar">
           {CATEGORY_OPTIONS.map((opt) => (
             <button
               key={opt.value}
@@ -280,7 +280,7 @@ function App() {
               className={cn(
                 "px-3 py-1.5 rounded-full text-[10px] font-black border-2 transition-all whitespace-nowrap",
                 category === opt.value 
-                  ? "bg-[#00E676] border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] translate-x-[-1px] translate-y-[-1px]" 
+                  ? "bg-[#FFD600] border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] translate-x-[-1px] translate-y-[-1px]" 
                   : "bg-white border-gray-200 text-gray-400"
               )}
             >
