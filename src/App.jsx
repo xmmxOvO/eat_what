@@ -90,10 +90,11 @@ function App() {
       const geocoder = new window.AMap.Geocoder();
       
       // 1. 地理编码：地址 -> 经纬度
-      geocoder.getLocation(address, (status, result) => {
+    geocoder.getLocation(address, (status, result) => {
         if (status === 'complete' && result.geocodes.length > 0) {
           const location = result.geocodes[0].location;
-          fetchNearbyRestaurants(location);
+          // 明确传递当前的 distance 值，避免闭包问题
+          fetchNearbyRestaurants(location, distance);
         } else {
           setErrorMsg('高德没找到这个地址... 试着写详细点？');
           setIsSearching(false);
@@ -106,7 +107,7 @@ function App() {
     }
   };
 
-  const fetchNearbyRestaurants = (location) => {
+  const fetchNearbyRestaurants = (location, searchRadius) => {
     const placeSearch = new window.AMap.PlaceSearch({
       type: '餐饮服务',
       pageSize: 50,
@@ -118,7 +119,8 @@ function App() {
 
     const searchPage = (pageIndex) => {
       placeSearch.setPageIndex(pageIndex);
-      placeSearch.searchNearBy('', location, distance, (status, result) => {
+      // 使用明确传递进来的 searchRadius
+      placeSearch.searchNearBy('', location, searchRadius, (status, result) => {
         if (status === 'complete' && result.poiList) {
           const pois = result.poiList.pois.map(poi => ({
             id: poi.id,
@@ -126,29 +128,29 @@ function App() {
             address: poi.address || '暂无详细地址',
             rating: poi.biz_ext?.rating || (Math.random() * 1.5 + 3.5).toFixed(1),
             image: poi.photos?.[0]?.url || `https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=500&q=80`,
-            distance: poi.distance,
+            distance: parseInt(poi.distance), // 确保是数字
             location: poi.location
           }));
 
           allResults = [...allResults, ...pois];
 
-          // 动态调整上限：距离越远，允许获取的数量越多
-          const maxCount = distance >= 1000 ? 1000 : 300;
+          // 动态调整上限：2km 模式下允许获取更多
+          const maxCount = searchRadius >= 2000 ? 2000 : (searchRadius >= 1000 ? 1000 : 300);
 
           if (result.poiList.pois.length === 50 && allResults.length < maxCount) {
             searchPage(pageIndex + 1);
           } else {
-            setRestaurants(allResults);
+            // 最终结果按距离排序
+            const sortedResults = allResults.sort((a, b) => a.distance - b.distance);
+            setRestaurants(sortedResults);
             setIsSearching(false);
-            if (allResults.length >= maxCount) {
-              console.log(`已达到搜寻上限 ${maxCount} 条`);
-            }
           }
         } else if (status === 'no_data') {
           if (allResults.length > 0) {
-            setRestaurants(allResults);
+            const sortedResults = allResults.sort((a, b) => a.distance - b.distance);
+            setRestaurants(sortedResults);
           } else {
-            setErrorMsg(`方圆 ${distance >= 1000 ? (distance/1000)+'km' : distance+'米'} 内好像真没吃的... 你在沙漠吗？`);
+            setErrorMsg(`方圆 ${searchRadius >= 1000 ? (searchRadius/1000)+'km' : searchRadius+'米'} 内好像真没吃的...`);
           }
           setIsSearching(false);
         } else {
