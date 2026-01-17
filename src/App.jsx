@@ -210,25 +210,25 @@ function App() {
       </header>
 
       {/* Search Section */}
-      <div className="px-6 mb-8">
-        <div className="flex flex-row gap-3">
+      <div className="px-6 mb-6">
+        <div className="flex flex-row gap-2">
           <div className="relative group flex-1">
-            <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-[#FF3D00] group-focus-within:scale-110 transition-transform" size={20} />
+            <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-[#FF3D00] group-focus-within:scale-110 transition-transform" size={16} />
             <input
               type="text"
               value={address}
               onChange={(e) => setAddress(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
               placeholder="你在哪儿呢？"
-              className="w-full bg-white border-4 border-black rounded-2xl py-4 pl-12 pr-4 text-lg font-bold shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] focus:outline-none focus:translate-x-1 focus:translate-y-1 focus:shadow-none transition-all"
+              className="w-full bg-white border-2 border-black rounded-xl py-2.5 pl-10 pr-4 text-sm font-bold shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] focus:outline-none focus:translate-x-0.5 focus:translate-y-0.5 focus:shadow-none transition-all"
             />
           </div>
           <button
             onClick={handleSearch}
             disabled={isSearching}
-            className="bg-[#00E676] text-black border-4 border-black rounded-2xl px-6 py-4 text-xl font-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-x-1 active:translate-y-1 transition-all flex items-center justify-center gap-2 hover:bg-[#00c853] whitespace-nowrap"
+            className="bg-[#00E676] text-black border-2 border-black rounded-xl px-4 py-2.5 text-base font-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-x-0.5 active:translate-y-0.5 transition-all flex items-center justify-center gap-2 hover:bg-[#00c853] whitespace-nowrap"
           >
-            {isSearching ? <div className="animate-spin rounded-full h-6 w-6 border-4 border-black border-t-transparent" /> : <Search size={24} />}
+            {isSearching ? <div className="animate-spin rounded-full h-5 w-5 border-2 border-black border-t-transparent" /> : <Search size={20} />}
           </button>
         </div>
         <AnimatePresence>
@@ -237,7 +237,7 @@ function App() {
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="mt-4 text-xs text-red-500 font-bold bg-red-50 p-3 rounded-xl border-4 border-red-200 shadow-[4px_4px_0px_0px_#fee2e2]"
+              className="mt-3 text-[10px] text-red-500 font-bold bg-red-50 p-2 rounded-lg border-2 border-red-200 shadow-[2px_2px_0px_0px_#fee2e2]"
             >
               ⚠️ {errorMsg}
             </motion.p>
@@ -298,18 +298,18 @@ function App() {
       </div>
 
       {/* Random Button */}
-      <div className="fixed bottom-8 left-0 right-0 px-6 z-20">
+      <div className="fixed bottom-6 left-0 right-0 px-6 z-20">
         <motion.button
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.95 }}
           onClick={handleRandomize}
           disabled={isSpinning || restaurants.length === 0}
           className={cn(
-            "w-full py-6 rounded-3xl text-3xl font-black border-4 border-black shadow-[0_10px_0_0_#000] active:shadow-none active:translate-y-2 transition-all uppercase tracking-widest",
+            "w-full py-4 rounded-2xl text-xl font-black border-2 border-black shadow-[0_6px_0_0_#000] active:shadow-none active:translate-y-1 transition-all uppercase tracking-widest",
             isSpinning ? "bg-gray-400 text-gray-200" : "bg-[#FF3D00] text-white"
           )}
         >
-          {isSpinning ? '命运之轮转动中...' : '随便吃一个！'}
+          {isSpinning ? '正在挑选...' : '随便吃一个！'}
         </motion.button>
       </div>
 
