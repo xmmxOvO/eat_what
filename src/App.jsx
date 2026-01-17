@@ -235,7 +235,7 @@ function App() {
 
       {/* Search Section */}
       <div className="px-6 mb-6">
-        <div className="flex flex-row gap-2 mb-5">
+        <div className="flex flex-row gap-2 mb-4">
           <div className="relative group flex-1">
             <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-[#FF3D00] group-focus-within:scale-110 transition-transform" size={16} />
             <input
@@ -247,6 +247,21 @@ function App() {
               className="w-full bg-white border-2 border-black rounded-xl py-2.5 pl-10 pr-4 text-sm font-bold shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] focus:outline-none focus:translate-x-0.5 focus:translate-y-0.5 focus:shadow-none transition-all"
             />
           </div>
+
+          {/* Distance Select - Integrated into search row */}
+          <div className="relative">
+            <select
+              value={distance}
+              onChange={(e) => setDistance(Number(e.target.value))}
+              className="h-full bg-[#FFD600] border-2 border-black rounded-xl px-2 pr-6 text-[10px] font-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] focus:outline-none appearance-none cursor-pointer"
+            >
+              {DISTANCE_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+            <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none font-black text-[8px]">▼</div>
+          </div>
+
           <button
             onClick={handleSearch}
             disabled={isSearching}
@@ -256,26 +271,8 @@ function App() {
           </button>
         </div>
 
-        {/* Distance Filter - Added pt-2 and improved spacing */}
-        <div className="flex flex-row gap-1.5 overflow-x-auto pt-2 pb-1 no-scrollbar">
-          {DISTANCE_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              onClick={() => setDistance(opt.value)}
-              className={cn(
-                "px-3 py-1.5 rounded-full text-[10px] font-black border-2 transition-all whitespace-nowrap",
-                distance === opt.value 
-                  ? "bg-[#FFD600] border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] translate-x-[-1px] translate-y-[-1px]" 
-                  : "bg-white border-gray-200 text-gray-400"
-              )}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-
         {/* Category Filter */}
-        <div className="flex flex-row gap-1.5 overflow-x-auto pt-2 pb-2 no-scrollbar">
+        <div className="flex flex-row gap-1.5 overflow-x-auto pb-2 no-scrollbar">
           {CATEGORY_OPTIONS.map((opt) => (
             <button
               key={opt.value}
