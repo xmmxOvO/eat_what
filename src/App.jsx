@@ -20,7 +20,7 @@ function cn(...inputs) {
 function App() {
   const [address, setAddress] = useState(() => localStorage.getItem('last_address') || '');
   const [distance, setDistance] = useState(500);
-  const [category, setCategory] = useState('餐饮服务');
+  const [category, setCategory] = useState('050100|050200|050300|050400');
   const [restaurants, setRestaurants] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isSpinning, setIsSpinning] = useState(false);
@@ -41,11 +41,17 @@ function App() {
   ];
 
   const CATEGORY_OPTIONS = [
-    { label: '全部', value: '餐饮服务' },
-    { label: '三餐', value: '中餐厅|外国餐厅|快餐厅' },
-    { label: '甜点', value: '甜品店|糕点店' },
-    { label: '饮品', value: '咖啡厅|奶茶店|饮品店|茶艺馆' },
+    { label: '三餐', value: '050100|050200|050300|050400' },
+    { label: '甜点', value: '050800' },
+    { label: '饮品', value: '050500' },
   ];
+
+  // 当分类改变时自动触发搜索
+  useEffect(() => {
+    if (address && mapReady) {
+      handleSearch();
+    }
+  }, [category]);
 
   // 持久化地址
   useEffect(() => {
@@ -276,7 +282,11 @@ function App() {
           {CATEGORY_OPTIONS.map((opt) => (
             <button
               key={opt.value}
-              onClick={() => setCategory(opt.value)}
+              onClick={() => {
+                setCategory(opt.value);
+                setSelectedRestaurant(null);
+                setShowResult(false);
+              }}
               className={cn(
                 "px-3 py-1.5 rounded-full text-[10px] font-black border-2 transition-all whitespace-nowrap",
                 category === opt.value 
@@ -291,8 +301,8 @@ function App() {
 
         {/* 诊断信息面板 */}
         {restaurants.length > 0 && !isSearching && (
-          <div className="mt-2 text-[9px] text-gray-400 font-bold flex justify-between px-1">
-            <span>找到 {restaurants.length} 家餐厅</span>
+          <div className="mt-2 text-[9px] text-gray-400 font-bold flex justify-between px-1 animate-fadeIn">
+            <span>已找到周边 {restaurants.length} 家 {CATEGORY_OPTIONS.find(o => o.value === category)?.label}</span>
             <span>覆盖范围: {restaurants[restaurants.length - 1].distance}m</span>
           </div>
         )}
