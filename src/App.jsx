@@ -19,6 +19,7 @@ function cn(...inputs) {
 
 function App() {
   const [address, setAddress] = useState(() => localStorage.getItem('last_address') || '');
+  const [distance, setDistance] = useState(500);
   const [restaurants, setRestaurants] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isSpinning, setIsSpinning] = useState(false);
@@ -29,6 +30,14 @@ function App() {
   const [errorMsg, setErrorMsg] = useState('');
 
   const scrollContainerRef = useRef(null);
+
+  const DISTANCE_OPTIONS = [
+    { label: '100m', value: 100 },
+    { label: '200m', value: 200 },
+    { label: '500m', value: 500 },
+    { label: '1km', value: 1000 },
+    { label: '2km', value: 2000 },
+  ];
 
   // 持久化地址
   useEffect(() => {
@@ -109,7 +118,7 @@ function App() {
 
     const searchPage = (pageIndex) => {
       placeSearch.setPageIndex(pageIndex);
-      placeSearch.searchNearBy('', location, 500, (status, result) => {
+      placeSearch.searchNearBy('', location, distance, (status, result) => {
         if (status === 'complete' && result.poiList) {
           const pois = result.poiList.pois.map(poi => ({
             id: poi.id,
@@ -133,7 +142,7 @@ function App() {
           if (allResults.length > 0) {
             setRestaurants(allResults);
           } else {
-            setErrorMsg('方圆 500 米内好像真没吃的... 你在沙漠吗？');
+            setErrorMsg(`方圆 ${distance >= 1000 ? (distance/1000)+'km' : distance+'米'} 内好像真没吃的... 你在沙漠吗？`);
           }
           setIsSearching(false);
         } else {
@@ -211,6 +220,24 @@ function App() {
 
       {/* Search Section */}
       <div className="px-6 mb-6">
+        {/* Distance Filter */}
+        <div className="flex flex-row gap-1.5 mb-3 overflow-x-auto pb-1 no-scrollbar">
+          {DISTANCE_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => setDistance(opt.value)}
+              className={cn(
+                "px-3 py-1 rounded-full text-[10px] font-black border-2 transition-all whitespace-nowrap",
+                distance === opt.value 
+                  ? "bg-[#FFD600] border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] translate-x-[-1px] translate-y-[-1px]" 
+                  : "bg-white border-gray-200 text-gray-400"
+              )}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+
         <div className="flex flex-row gap-2">
           <div className="relative group flex-1">
             <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-[#FF3D00] group-focus-within:scale-110 transition-transform" size={16} />
