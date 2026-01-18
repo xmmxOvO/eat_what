@@ -161,7 +161,7 @@ function App() {
   const CATEGORY_OPTIONS = [
     { label: '三餐', value: '050100|050200|050300|050400' },
     { label: '甜点', value: '050800' },
-    { label: '饮品', value: '050500' },
+    { label: '奶茶', value: '050503' },
   ];
 
   // 当分类改变时自动触发搜索
