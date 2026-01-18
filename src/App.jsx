@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Search, MapPin, Utensils, X, Star, Navigation, RotateCcw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { clsx } from 'clsx';
@@ -15,6 +15,84 @@ const AMAP_CONFIG = {
 
 function cn(...inputs) {
   return twMerge(clsx(inputs));
+}
+
+// 自定义 Hook: 用户位置定位
+function useUserLocation(mapReady, onLocationSuccess, onLocationError) {
+  const [isLocating, setIsLocating] = useState(false);
+  const geolocationRef = useRef(null);
+
+  useEffect(() => {
+    if (!mapReady || !window.AMap || geolocationRef.current) return;
+
+    // 初始化定位插件
+    geolocationRef.current = new window.AMap.Geolocation({
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 0,
+      convert: true,
+      showButton: false,
+      buttonPosition: 'RB',
+      showMarker: false,
+      showCircle: false,
+      panToLocation: false,
+      zoomToAccuracy: false,
+    });
+
+    // 请求定位
+    setIsLocating(true);
+    geolocationRef.current.getCurrentPosition((status, result) => {
+      setIsLocating(false);
+      
+      if (status === 'complete') {
+        const location = result.position;
+        // 逆地理编码：坐标转地址
+        const geocoder = new window.AMap.Geocoder();
+        geocoder.getAddress(location, (geocodeStatus, geocodeResult) => {
+          if (geocodeStatus === 'complete' && geocodeResult.regeocode) {
+            const address = geocodeResult.regeocode.formattedAddress || 
+                          geocodeResult.regeocode.addressComponent.province + 
+                          geocodeResult.regeocode.addressComponent.city + 
+                          geocodeResult.regeocode.addressComponent.district + 
+                          geocodeResult.regeocode.addressComponent.street + 
+                          geocodeResult.regeocode.addressComponent.streetNumber;
+            
+            onLocationSuccess({
+              location: location,
+              address: address,
+            });
+          } else {
+            // 如果逆地理编码失败，使用坐标作为地址
+            onLocationSuccess({
+              location: location,
+              address: `${location.lat.toFixed(6)}, ${location.lng.toFixed(6)}`,
+            });
+          }
+        });
+      } else {
+        // 定位失败，尝试 IP 定位
+        try {
+          const ipGeolocation = new window.AMap.CitySearch();
+          ipGeolocation.getLocalCity((ipStatus, ipResult) => {
+            if (ipStatus === 'complete' && ipResult.city && ipResult.bounds) {
+              // IP 定位成功，使用城市中心点
+              const center = ipResult.bounds.getCenter();
+              onLocationSuccess({
+                location: center,
+                address: ipResult.city + '（IP定位）',
+              });
+            } else {
+              onLocationError(result.message || '定位失败，请手动输入地址');
+            }
+          });
+        } catch (error) {
+          onLocationError('定位失败，请手动输入地址');
+        }
+      }
+    });
+  }, [mapReady, onLocationSuccess, onLocationError]);
+
+  return { isLocating };
 }
 
 function App() {
@@ -41,6 +119,35 @@ function App() {
   const inputRef = useRef(null);
   const autocompleteRef = useRef(null);
   const debounceTimerRef = useRef(null);
+  const [isLocating, setIsLocating] = useState(false);
+  const hasAutoLocatedRef = useRef(false);
+  const fetchNearbyRestaurantsRef = useRef(null);
+
+  // 定位失败回调
+  const handleLocationError = useCallback((message) => {
+    setIsLocating(false);
+    setErrorMsg('无法自动获取位置，请手动输入地址');
+    setTimeout(() => {
+      setErrorMsg('');
+      if (inputRef.current) {
+        inputRef.current.focus();
+      }
+    }, 3000);
+  }, []);
+
+  // 定位成功回调 - 使用 ref 来访问 fetchNearbyRestaurants
+  const handleLocationSuccess = useCallback(({ location, address }) => {
+    setAddressInput(address);
+    setAddress(address);
+    setLockedLocation(location);
+    setIsLocating(false);
+    hasAutoLocatedRef.current = true;
+    
+    // 自动触发搜索
+    if (fetchNearbyRestaurantsRef.current) {
+      fetchNearbyRestaurantsRef.current(location, distance, category);
+    }
+  }, [distance, category]);
 
   const DISTANCE_OPTIONS = [
     { label: '100m', value: 100 },
@@ -94,7 +201,7 @@ function App() {
     };
 
     const script = document.createElement('script');
-    script.src = `https://webapi.amap.com/maps?v=2.0&key=${AMAP_CONFIG.key}&plugin=AMap.Geocoder,AMap.PlaceSearch,AMap.AutoComplete`;
+    script.src = `https://webapi.amap.com/maps?v=2.0&key=${AMAP_CONFIG.key}&plugin=AMap.Geocoder,AMap.PlaceSearch,AMap.AutoComplete,AMap.Geolocation`;
     script.async = true;
     script.onload = () => setMapReady(true);
     document.head.appendChild(script);
@@ -263,6 +370,22 @@ function App() {
     searchPage(1);
   };
 
+  // 将 fetchNearbyRestaurants 存储到 ref
+  useEffect(() => {
+    fetchNearbyRestaurantsRef.current = fetchNearbyRestaurants;
+  }, [distance, category]);
+
+  // 使用定位 Hook
+  const { isLocating: isLocatingFromHook } = useUserLocation(
+    mapReady && !hasAutoLocatedRef.current,
+    handleLocationSuccess,
+    handleLocationError
+  );
+
+  useEffect(() => {
+    setIsLocating(isLocatingFromHook);
+  }, [isLocatingFromHook]);
+
   const handleRandomize = () => {
     if (restaurants.length === 0) {
       setErrorMsg('先搜索周边的美食，才能开始随机挑选哦！');
@@ -333,9 +456,14 @@ function App() {
             <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-[#FF3D00] group-focus-within:scale-110 transition-transform z-10" size={16} />
             <input
               type="text"
-              value={addressInput}
-              onChange={(e) => handleAddressInputChange(e.target.value)}
+              value={isLocating ? '正在获取当前位置...' : addressInput}
+              onChange={(e) => {
+                if (!isLocating) {
+                  handleAddressInputChange(e.target.value);
+                }
+              }}
               onKeyDown={(e) => {
+                if (isLocating) return;
                 if (e.key === 'Enter') {
                   handleSearch();
                 } else if (e.key === 'Escape') {
@@ -343,13 +471,19 @@ function App() {
                 }
               }}
               onFocus={() => {
-                if (autocompleteSuggestions.length > 0) {
+                if (!isLocating && autocompleteSuggestions.length > 0) {
                   setShowSuggestions(true);
                 }
               }}
               placeholder="你在哪儿呢？"
-              className="w-full bg-white border-2 border-black rounded-xl py-2.5 pl-10 pr-4 text-sm font-bold shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] focus:outline-none focus:translate-x-0.5 focus:translate-y-0.5 focus:shadow-none transition-all"
+              disabled={isLocating}
+              className="w-full bg-white border-2 border-black rounded-xl py-2.5 pl-10 pr-4 text-sm font-bold shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] focus:outline-none focus:translate-x-0.5 focus:translate-y-0.5 focus:shadow-none transition-all disabled:opacity-70 disabled:cursor-not-allowed"
             />
+            {isLocating && (
+              <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                <div className="animate-spin rounded-full h-4 w-4 border-2 border-[#FF3D00] border-t-transparent"></div>
+              </div>
+            )}
             
             {/* 地址下拉提示列表 */}
             <AnimatePresence>
