@@ -109,6 +109,7 @@ function App() {
   const [showResult, setShowResult] = useState(false);
   const [mapReady, setMapReady] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [infoMsg, setInfoMsg] = useState('');
   
   // 地址自动完成相关状态
   const [autocompleteSuggestions, setAutocompleteSuggestions] = useState([]);
@@ -126,13 +127,13 @@ function App() {
   // 定位失败回调
   const handleLocationError = useCallback((message) => {
     setIsLocating(false);
-    setErrorMsg('无法自动获取位置，请手动输入地址');
+    setInfoMsg('暂时没能感知到你的位置，手动输入地址吧～');
     setTimeout(() => {
-      setErrorMsg('');
+      setInfoMsg('');
       if (inputRef.current) {
         inputRef.current.focus();
       }
-    }, 3000);
+    }, 4000);
   }, []);
 
   // 定位成功回调 - 使用 ref 来访问 fetchNearbyRestaurants
@@ -577,6 +578,16 @@ function App() {
               className="mt-3 text-[10px] text-red-500 font-bold bg-red-50 p-2 rounded-lg border-2 border-red-200 shadow-[2px_2px_0px_0px_#fee2e2]"
             >
               ⚠️ {errorMsg}
+            </motion.p>
+          )}
+          {infoMsg && (
+            <motion.p 
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="mt-3 text-[10px] text-blue-600 font-bold bg-blue-50 p-2 rounded-lg border-2 border-blue-200 shadow-[2px_2px_0px_0px_#dbeafe]"
+            >
+              💡 {infoMsg}
             </motion.p>
           )}
         </AnimatePresence>
